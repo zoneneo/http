@@ -15,7 +15,8 @@ WSGI对application的要求有3个：
    - 返回一个iterable可迭代对象
 
 >Django、Flask 遵循WSGI，后端使用werkzeug,除了选择现有的web框架,我们也可以选择werkzeug来实现简短的web框架。
->可以使用python自带库，通过几行命令启动一个web服务做文件下载。
+>这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
+>也可以使用python自带库，通过几行命令启动一个web服务做文件下载。
 
 ```
 import http.server
@@ -28,6 +29,6 @@ with socketserver.TCPServer(('', PORT), Handler) as httpd:
     print("serving at port", PORT)
     httpd.serve_forever()
 
->这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
+
 
 
