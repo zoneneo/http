@@ -1,110 +1,166 @@
 #!/usr/bin/env python
-#--coding:utf-8--
 import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from os import path
+from functools import update_wrapper
+from werkzeug.wrappers import Request, Response
+from werkzeug.routing import Map, Rule
+from werkzeug.exceptions import HTTPException, NotFound
+# from werkzeug.wsgi import SharedDataMiddleware
+from werkzeug.utils import redirect
 from urllib.parse import urlparse
-import json
+
+
+def _endpoint_from_view_func(view_func):
+    """Internal helper that returns the default endpoint for a given
+    function.  This always is the function name.
+    """
+    assert view_func is not None, "expected view func if endpoint is not provided."
+    return view_func.__name__
+
+def setupmethod(f):
+    """Wraps a method so that it performs a check in debug mode if the
+    first request was already handled.
+    """
 
 #Map的作用则是保存所有Rule对象。werkzeug库中的Map与Rule在Flask中的应用
 class Flask(object):
-    def __init__(self):
-        self.url_map = {}
-        
-    def __call__(self, environ, start_response):  # 根据WSGI协议，middleware必须是可调用对象
-        self.dispatch_request()
-        return application(environ, start_response)
-    
-    def route(self, rule):  # Flask使用装饰器来完成url与处理函数的映射关系建立
-        def decorator(f):   # 简单，侵入小，优雅
-            self.url_map[rule] = f
-            return f
-        return decorator
-    
-    def dispath_request(self):
-        url = get_url_from_environ() #解析environ获得url 
-        return self.url_map[url]() #从url_map中找到对应的处理函数，并调用
 
+    def __init__(self):
+        # template_path = os.path.join(os.path.dirname(__file__), 'templates')
+        # self.jinja_env = Environment(loader=FileSystemLoader(template_path), autoescape=True)
+        # self.url_map = Map([
+        # Rule('/', endpoint='new_url'),
+        # Rule('/<short_id>', endpoint='follow_short_link'),
+        # Rule('/<short_id>+', endpoint='short_link_details')
+        # ])
+        self.debug=True
+        self.url_rule_class = Rule
+        self.url_map_class = Map
+        self.url_map = self.url_map_class()
+        self.view_functions = {}
+        self._got_first_request =True
+
+    def endpoint(self, endpoint):
+        def decorator(f):
+            self.view_functions[endpoint] = f
+            return f
+
+        return decorator
+
+
+    def add_url_rule(
+        self,
+        rule,
+        endpoint=None,
+        view_func=None,
+        provide_automatic_options=None,
+        **options
+    ):
+        if endpoint is None:
+            endpoint = _endpoint_from_view_func(view_func)
+        options["endpoint"] = endpoint
+        methods = options.pop("methods", None)
+
+        # if the methods are not given and the view_func object knows its
+        # methods we can use that instead.  If neither exists, we go with
+        # a tuple of only ``GET`` as default.
+        if methods is None:
+            methods = getattr(view_func, "methods", None) or ("GET",)
+        if isinstance(methods, str):#string_types
+            raise TypeError(
+                "Allowed methods have to be iterables of strings, "
+                'for example: @app.route(..., methods=["POST"])'
+            )
+        methods = set(item.upper() for item in methods)
+
+        # Methods that should always be added
+        required_methods = set(getattr(view_func, "required_methods", ()))
+
+        # starting with Flask 0.8 the view_func object can disable and
+        # force-enable the automatic options handling.
+        if provide_automatic_options is None:
+            provide_automatic_options = getattr(
+                view_func, "provide_automatic_options", None
+            )
+
+        if provide_automatic_options is None:
+            if "OPTIONS" not in methods:
+                provide_automatic_options = True
+                required_methods.add("OPTIONS")
+            else:
+                provide_automatic_options = False
+
+        # Add the required methods now.
+        methods |= required_methods
+
+        rule = self.url_rule_class(rule, methods=methods, **options)
+        rule.provide_automatic_options = provide_automatic_options
+
+        self.url_map.add(rule)
+        if view_func is not None:
+            # old_func = self.view_functions.get(endpoint)
+            # if old_func is not None and old_func != view_func:
+            #     raise AssertionError(
+            #         "View function mapping is overwriting an "
+            #         "existing endpoint function: %s" % endpoint
+            #     )
+            self.view_functions[endpoint] = view_func
+
+
+    def route(self, rule, **options):
+        def decorator(f):
+            endpoint = options.pop("endpoint", None)
+            self.add_url_rule(rule, endpoint, f, **options)
+            return f
+
+        return decorator
+
+
+    def render_template(self, template_name, **context):
+        t = self.jinja_env.get_template(template_name)
+        return Response(t.render(context), mimetype='text/html')
+
+
+    def dispatch_request(self, request):
+        adapter = self.url_map.bind_to_environ(request.environ)
+        try:
+            endpoint, values = adapter.match()
+            #return getattr(self, 'on_' + endpoint)(request, **values)
+            return self.view_functions.get(endpoint)(request, **values)
+        except HTTPException as e:
+            return e
+
+
+    def wsgi_app(self, environ, start_response):
+        request = Request(environ)
+        response = self.dispatch_request(request)
+        return response(environ, start_response)
+
+
+    def run(self, host=None, port=None, debug=None, load_dotenv=True, **options):
+        from werkzeug.serving import run_simple
+        try:
+            run_simple(host, port, self, **options)
+        finally:
+            self._got_first_request = False
+
+
+    def __call__(self, environ, start_response):
+        return self.wsgi_app(environ, start_response)
 
 app = Flask()
 
 
-@app.route('/api/user',method='GET')
-def get_user()：
-	user={'name':'admin','email':'test@exmple.com'}
-	return json.dumps(user)
+@app.route('/api/user',methods=['GET'])
+def get_user():
+    user={'name':'admin','email':'test@exmple.com'}
+    return json.dumps(user)
 
-@app.route('/api/user',method='POST')
-def add_user()：
-	msg={'status':'200','message':'ok','data':params}
-	return json.dumps(msg)
-
-
-class MyHTTPRequestHandler(BaseHTTPRequestHandler):
-	curdir = path.dirname(path.realpath(__file__))
-	content_type={'.htm':'text/html','.html':'text/html','.htc':'text/html',
-	'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'application/x-png','.gif':'image/gif',
-	'.xml':'text/xml','.ico':'image/x-icon','.json':'application/json'}
-
-	def _get_realpath(self):
-		uri = urlparse(self.path)
-		filepath, query = uri.path, uri.query
-		if filepath.endswith('/'):
-			filepath += 'index.html'
-		return path.realpath(self.curdir + os.sep + filepath)
-
-
-	def _send_file(self, file):
-		name, ext = path.splitext(file)
-		c_type=self.content_type.get(ext)
-		if c_type is None:
-			self.send_error(403,'File Not Found: %s' % self.path)
-		try:
-			with open(file,'rb') as f:
-				content = f.read()
-				self.send_response(200)
-				self.send_header('Content-type',c_type)
-				self.end_headers()
-				self.wfile.write(content)
-		except IOError:
-			self.send_error(404,'File Not Found: %s' % self.path)
-
-	def _handle(self,method):
-    file = self._get_realpath()
-    if not self.path.startswith('/api/'):
-    	self._send_file(file)
-    else:
-        uri = urlparse(self.path)
-        path, query = uri.path, uri.query
-        func=app.get(path,method)
-        res=func()
-        content=res.encdoe('utf-8')
-        self.send_response(200)
-        self.send_header('Content-type','application/json')
-        self.wfile.write(res)
-
-
-    def do_GET(self):
-        self._handle('GET')
-
-    def do_POST(self):
-        self._handle('POST')
-
-    def do_PUT(self):
-        self._handle('PUT')
-
-    def do_DELETE(self):
-        self._handle('DEL')
+@app.route('/api/user',methods=['POST'])
+def add_user():
+    msg={'status':'200','message':'ok','data':params}
+    return json.dumps(msg)
 
 
 
 if __name__ == '__main__':
-    host = ''
-    port = 8000
-    print('starting server, port', port)
-
-    # Server settings
-    server_address = ('', port)
-    httpd = HTTPServer(server_address, MyHTTPRequestHandler)
-    print('running server...')
-    httpd.serve_forever()
+    app.run('127.0.0.1', 6000, app, use_debugger=True, use_reloader=True)
