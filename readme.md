@@ -17,7 +17,9 @@ WSGI对application的要求有3个：
 >Django、Flask 遵循WSGI，后端使用werkzeug,除了选择现有的web框架,我们也可以选择werkzeug来实现简短的web框架。
 >werkzeug实现基于http.server库的HTTPServer,基于BaseHTTPRequestHandler改写的WSGIRequestHandler。
 >通过一行命令使用默认的SimpleHTTPRequestHandler启动web服务做文件下载。
-``` python3 -m http.server 8000 --bind 127.0.0.1
+
+```
+python3 -m http.server 8000 --bind 127.0.0.1
 
 实现的功能相当如下程序
 
