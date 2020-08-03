@@ -23,7 +23,7 @@ server负责接收HTTP请求，根据请求数据组装environ，定义start_res
 
 > 命令默认使用的SimpleHTTPRequestHandler启动web服务,相当如下程序。
 
-`
+```
 import http.server
 import socketserver
 
@@ -33,14 +33,14 @@ Handler = http.server.SimpleHTTPRequestHandler
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
     print("serving at port", PORT)
     httpd.serve_forever()
-`
+```
 
 >wsgiref是WSGI细则的一个参考实现，它提供了处理WSGI环境变量、response头和WSGI服务器基类。
 这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
 wsgiref.simple_server实现了WSGIServer和WSGIRequestHandler,这些基于http.server和http.server.BaseHTTPRequestHandler
 wsgiref.simple_server.make_server(host, port, app, server_class=WSGIServer, handler_class=WSGIRequestHandler)
 
-`
+```
 from wsgiref.simple_server import make_server
 
 def hello_world_app(environ, start_response):
@@ -56,7 +56,7 @@ with make_server('', 8000, hello_world_app) as httpd:
 
     # Serve until process is killed
     httpd.serve_forever()
-`
+```
 
 
 
