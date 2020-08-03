@@ -35,9 +35,8 @@ with socketserver.TCPServer(("", PORT), Handler) as httpd:
     httpd.serve_forever()
 ```
 
->wsgiref是WSGI细则的一个参考实现，它提供了处理WSGI环境变量、response头和WSGI服务器基类。
-这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
-wsgiref.simple_server实现了WSGIServer和WSGIRequestHandler,这些基于http.server和http.server.BaseHTTPRequestHandler
+> wsgiref库是WSGI细则的一个参考实现，它提供了处理WSGI环境变量、response头和WSGI服务器基类。基于wsgiref库来实现带路由功能的application,用于简单快速的开发测试。
+> wsgiref.simple_server实现了WSGIServer和WSGIRequestHandler,这些基于http.server和http.server.BaseHTTPRequestHandler
 wsgiref.simple_server.make_server(host, port, app, server_class=WSGIServer, handler_class=WSGIRequestHandler)
 
 ```
