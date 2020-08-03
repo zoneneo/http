@@ -15,10 +15,11 @@ WSGI对application的要求有3个：
    - 返回一个iterable可迭代对象
 
 >Django、Flask 遵循WSGI，后端使用werkzeug,除了选择现有的web框架,我们也可以选择werkzeug来实现简短的web框架。
->这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
->也可以使用python自带库，通过一行命令启动一个web服务做文件下载。
-
+>werkzeug实现基于http.server库的HTTPServer,基于BaseHTTPRequestHandler改写的WSGIRequestHandler。
+>通过一行命令使用默认的SimpleHTTPRequestHandler启动web服务做文件下载。
 ``` python3 -m http.server 8000 --bind 127.0.0.1
+
+实现的功能相当如下程序
 
 ```
 import http.server
@@ -30,6 +31,31 @@ Handler = http.server.SimpleHTTPRequestHandler
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
     print("serving at port", PORT)
     httpd.serve_forever()
+
+
+>wsgiref是WSGI细则的一个参考实现，它提供了处理WSGI环境变量、response头和WSGI服务器基类。
+这里重点使用python自带wsgiref库，实现带路由功能的application,这可以用于简单快速的开发测试。
+wsgiref.simple_server实现了WSGIServer和WSGIRequestHandler,这些基于http.server和http.server.BaseHTTPRequestHandler
+wsgiref.simple_server.make_server(host, port, app, server_class=WSGIServer, handler_class=WSGIRequestHandler)
+
+```
+from wsgiref.simple_server import make_server
+
+def hello_world_app(environ, start_response):
+    status = '200 OK'  # HTTP Status
+    headers = [('Content-type', 'text/plain; charset=utf-8')]  # HTTP Headers
+    start_response(status, headers)
+
+    # The returned object is going to be printed
+    return [b"Hello World"]
+
+with make_server('', 8000, hello_world_app) as httpd:
+    print("Serving on port 8000...")
+
+    # Serve until process is killed
+    httpd.serve_forever()
+
+
 
 
 
